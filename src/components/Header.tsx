@@ -47,8 +47,8 @@ export function Header({ user, isAdmin }: HeaderProps) {
           <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
             <MessageSquarePlus className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors">
-            AskAnon
+          <span className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">
+            Ask us anything
           </span>
         </Link>
 
