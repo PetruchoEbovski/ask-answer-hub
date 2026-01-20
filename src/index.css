@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
+    --background: 220 14% 96%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -15,16 +15,16 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 25% 95%;
+    --secondary: 220 14% 96%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 215 20% 94%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 38 92% 50%;
+    --accent: 221 83% 53%;
     --accent-foreground: 0 0% 100%;
 
     --success: 142 71% 45%;
@@ -34,31 +34,34 @@
     --warning-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 222 47% 11%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 221 83% 53%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 224 71% 15%;
+    --sidebar-foreground: 220 14% 96%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 224 71% 20%;
+    --sidebar-accent-foreground: 220 14% 96%;
+    --sidebar-border: 224 71% 20%;
+    --sidebar-ring: 221 83% 53%;
 
     --upvote: 142 71% 45%;
     --downvote: 0 84% 60%;
     --anonymous: 265 83% 57%;
+    
+    --gradient-start: 224 71% 15%;
+    --gradient-end: 221 83% 35%;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    --background: 224 71% 8%;
+    --foreground: 220 14% 96%;
 
     --card: 222 47% 9%;
     --card-foreground: 210 40% 98%;
@@ -119,11 +122,15 @@
 
 @layer utilities {
   .gradient-primary {
-    background: linear-gradient(135deg, hsl(222 47% 11%) 0%, hsl(222 47% 20%) 100%);
+    background: linear-gradient(135deg, hsl(224 71% 15%) 0%, hsl(221 83% 35%) 100%);
+  }
+
+  .gradient-banner {
+    background: linear-gradient(135deg, hsl(224 71% 20%) 0%, hsl(221 83% 40%) 100%);
   }
 
   .gradient-accent {
-    background: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(28 92% 50%) 100%);
+    background: linear-gradient(135deg, hsl(221 83% 53%) 0%, hsl(221 83% 45%) 100%);
   }
 
   .shadow-elegant {
