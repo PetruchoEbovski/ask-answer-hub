@@ -9,6 +9,10 @@ import { QuestionCard } from "@/components/QuestionCard";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
+interface QuestionAuthor {
+  full_name: string | null;
+}
+
 interface Question {
   id: string;
   title: string;
@@ -19,7 +23,7 @@ interface Question {
   downvotes: number;
   created_at: string;
   department: { name: string } | null;
-  author: { full_name: string | null } | null;
+  author: QuestionAuthor | null;
   answers: { id: string }[];
   userVote: 'up' | 'down' | null;
 }
@@ -90,8 +94,32 @@ export default function Questions() {
 
     const votesMap = new Map(votesData?.map(v => [v.question_id, v.vote_type as 'up' | 'down']) || []);
 
-    const formattedQuestions = (questionsData || []).map(q => ({
-      ...q,
+    // Fetch author profiles for non-anonymous questions
+    const authorIds = (questionsData || [])
+      .filter(q => !q.is_anonymous && q.author_id)
+      .map(q => q.author_id);
+    
+    const { data: profilesData } = authorIds.length > 0 
+      ? await supabase.from('profiles').select('user_id, full_name').in('user_id', authorIds)
+      : { data: [] };
+    
+    const profilesMap = new Map<string, QuestionAuthor>();
+    profilesData?.forEach(p => {
+      profilesMap.set(p.user_id, { full_name: p.full_name });
+    });
+
+    const formattedQuestions: Question[] = (questionsData || []).map(q => ({
+      id: q.id,
+      title: q.title,
+      content: q.content,
+      is_anonymous: q.is_anonymous,
+      status: q.status || 'open',
+      upvotes: q.upvotes,
+      downvotes: q.downvotes,
+      created_at: q.created_at,
+      department: q.department,
+      author: q.author_id && !q.is_anonymous ? profilesMap.get(q.author_id) || null : null,
+      answers: q.answers || [],
       userVote: votesMap.get(q.id) || null,
     }));
 
