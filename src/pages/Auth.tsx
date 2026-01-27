@@ -77,15 +77,7 @@ export default function Auth() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    // Check domain restriction
-    if (!email.endsWith("@getblock.io")) {
-      toast({
-        title: "Access Restricted",
-        description: "Only @getblock.io email addresses are allowed to sign up.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Domain restriction removed for testing
 
     setIsLoading(true);
     const redirectUrl = `${window.location.origin}/`;
