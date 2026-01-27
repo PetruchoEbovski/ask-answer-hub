@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Building, MessageSquare, Shield, Plus, Trash2, Check } from "lucide-react";
+import { ArrowLeft, Users, Building, MessageSquare, Shield, Plus, Trash2, Search, Filter, Clock, TrendingUp, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,13 +15,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
-interface UserWithRoles {
+interface DepartmentAdmin {
   id: string;
   user_id: string;
   email: string;
   full_name: string | null;
-  roles: string[];
-  created_at: string;
+  department_id: string;
+  department_name: string;
 }
 
 interface Department {
@@ -40,15 +40,29 @@ interface QuestionAdmin {
   answers_count: number;
 }
 
+type SortOption = 'newest' | 'trending' | 'answered';
+
 export default function Admin() {
   const { user, profile, isAdmin, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [users, setUsers] = useState<UserWithRoles[]>([]);
+  
+  // Department Admins state
+  const [departmentAdmins, setDepartmentAdmins] = useState<DepartmentAdmin[]>([]);
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [newAdminDepartment, setNewAdminDepartment] = useState("");
+  
+  // Departments state
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [questions, setQuestions] = useState<QuestionAdmin[]>([]);
   const [newDeptName, setNewDeptName] = useState("");
   const [newDeptDesc, setNewDeptDesc] = useState("");
+  
+  // Questions state
+  const [questions, setQuestions] = useState<QuestionAdmin[]>([]);
+  const [questionSearch, setQuestionSearch] = useState("");
+  const [questionDeptFilter, setQuestionDeptFilter] = useState<string>("all");
+  const [questionSort, setQuestionSort] = useState<SortOption>("newest");
+  
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
@@ -57,28 +71,46 @@ export default function Admin() {
     }
   }, [user, isAdmin, isLoading, navigate]);
 
-  const fetchUsers = async () => {
-    const { data: profilesData } = await supabase
-      .from('profiles')
-      .select('id, user_id, email, full_name, created_at')
-      .order('created_at', { ascending: false });
+  const fetchDepartmentAdmins = async () => {
+    // Fetch department_admins with profile info
+    const { data: adminsData } = await supabase
+      .from('department_admins')
+      .select('id, user_id, department_id');
 
-    if (profilesData) {
-      const usersWithRoles = await Promise.all(
-        profilesData.map(async (p) => {
-          const { data: rolesData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', p.user_id);
-
-          return {
-            ...p,
-            roles: rolesData?.map(r => r.role) || [],
-          };
-        })
-      );
-      setUsers(usersWithRoles);
+    if (!adminsData || adminsData.length === 0) {
+      setDepartmentAdmins([]);
+      return;
     }
+
+    // Get unique user IDs and department IDs
+    const userIds = [...new Set(adminsData.map(a => a.user_id))];
+    const deptIds = [...new Set(adminsData.map(a => a.department_id))];
+
+    // Fetch profiles
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('user_id, email, full_name')
+      .in('user_id', userIds);
+
+    // Fetch departments
+    const { data: depts } = await supabase
+      .from('departments')
+      .select('id, name')
+      .in('id', deptIds);
+
+    const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+    const deptsMap = new Map(depts?.map(d => [d.id, d.name]) || []);
+
+    const formattedAdmins: DepartmentAdmin[] = adminsData.map(a => ({
+      id: a.id,
+      user_id: a.user_id,
+      email: profilesMap.get(a.user_id)?.email || 'Unknown',
+      full_name: profilesMap.get(a.user_id)?.full_name || null,
+      department_id: a.department_id,
+      department_name: deptsMap.get(a.department_id) || 'Unknown',
+    }));
+
+    setDepartmentAdmins(formattedAdmins);
   };
 
   const fetchDepartments = async () => {
@@ -90,18 +122,31 @@ export default function Admin() {
   };
 
   const fetchQuestions = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('questions')
       .select(`
         id,
         title,
         status,
+        upvotes,
         created_at,
         department:departments(name),
         answers(id)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(50);
+      `);
+
+    if (questionDeptFilter !== "all") {
+      query = query.eq('department_id', questionDeptFilter);
+    }
+
+    if (questionSort === 'newest') {
+      query = query.order('created_at', { ascending: false });
+    } else if (questionSort === 'trending') {
+      query = query.order('upvotes', { ascending: false });
+    } else if (questionSort === 'answered') {
+      query = query.eq('status', 'answered').order('created_at', { ascending: false });
+    }
+
+    const { data } = await query.limit(100);
 
     if (data) {
       setQuestions(data.map(q => ({
@@ -113,45 +158,71 @@ export default function Admin() {
 
   useEffect(() => {
     if (user && isAdmin) {
-      Promise.all([fetchUsers(), fetchDepartments(), fetchQuestions()])
+      Promise.all([fetchDepartmentAdmins(), fetchDepartments(), fetchQuestions()])
         .finally(() => setIsLoadingData(false));
     }
   }, [user, isAdmin]);
 
-  const handleAddRole = async (userId: string, role: string) => {
-    const { error } = await supabase
-      .from('user_roles')
-      .insert({ user_id: userId, role: role as any });
-
-    if (error) {
-      if (error.code === '23505') {
-        toast({ title: "User already has this role", variant: "destructive" });
-      } else {
-        toast({ title: "Failed to add role", variant: "destructive" });
-      }
-    } else {
-      toast({ title: "Role added successfully" });
-      fetchUsers();
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchQuestions();
     }
-  };
+  }, [questionDeptFilter, questionSort]);
 
-  const handleRemoveRole = async (userId: string, role: string) => {
-    if (role === 'employee') {
-      toast({ title: "Cannot remove employee role", variant: "destructive" });
+  const handleAddDepartmentAdmin = async () => {
+    if (!newAdminEmail.trim() || !newAdminDepartment) {
+      toast({ title: "Please enter email and select department", variant: "destructive" });
       return;
     }
 
-    const { error } = await supabase
+    // Find user by email
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('email', newAdminEmail.trim().toLowerCase())
+      .maybeSingle();
+
+    if (profileError || !profileData) {
+      toast({ title: "User not found", description: "Make sure the user has signed up first", variant: "destructive" });
+      return;
+    }
+
+    // Add to department_admins
+    const { error: insertError } = await supabase
+      .from('department_admins')
+      .insert({ user_id: profileData.user_id, department_id: newAdminDepartment });
+
+    if (insertError) {
+      if (insertError.code === '23505') {
+        toast({ title: "User already assigned to this department", variant: "destructive" });
+      } else {
+        toast({ title: "Failed to add admin", variant: "destructive" });
+      }
+      return;
+    }
+
+    // Ensure user has responder role
+    await supabase
       .from('user_roles')
+      .upsert({ user_id: profileData.user_id, role: 'responder' as any }, { onConflict: 'user_id,role' });
+
+    toast({ title: "Admin added successfully" });
+    setNewAdminEmail("");
+    setNewAdminDepartment("");
+    fetchDepartmentAdmins();
+  };
+
+  const handleRemoveDepartmentAdmin = async (id: string) => {
+    const { error } = await supabase
+      .from('department_admins')
       .delete()
-      .eq('user_id', userId)
-      .eq('role', role as any);
+      .eq('id', id);
 
     if (error) {
-      toast({ title: "Failed to remove role", variant: "destructive" });
+      toast({ title: "Failed to remove admin", variant: "destructive" });
     } else {
-      toast({ title: "Role removed successfully" });
-      fetchUsers();
+      toast({ title: "Admin removed" });
+      fetchDepartmentAdmins();
     }
   };
 
@@ -218,6 +289,19 @@ export default function Admin() {
     }
   };
 
+  const filteredQuestions = questions.filter(q =>
+    q.title.toLowerCase().includes(questionSearch.toLowerCase())
+  );
+
+  // Group department admins by department
+  const adminsByDepartment = departmentAdmins.reduce((acc, admin) => {
+    if (!acc[admin.department_name]) {
+      acc[admin.department_name] = [];
+    }
+    acc[admin.department_name].push(admin);
+    return acc;
+  }, {} as Record<string, DepartmentAdmin[]>);
+
   if (isLoading || isLoadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -236,7 +320,7 @@ export default function Admin() {
       <main className="container max-w-6xl mx-auto px-4 py-8">
         <Button
           variant="ghost"
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/questions")}
           className="mb-6 -ml-2"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -246,15 +330,15 @@ export default function Admin() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Admin Panel</h1>
           <p className="text-muted-foreground">
-            Manage users, departments, and questions
+            Manage department admins, departments, and questions
           </p>
         </div>
 
-        <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
-            <TabsTrigger value="users" className="gap-2">
+        <Tabs defaultValue="admins" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+            <TabsTrigger value="admins" className="gap-2">
               <Users className="w-4 h-4" />
-              Users
+              Admins
             </TabsTrigger>
             <TabsTrigger value="departments" className="gap-2">
               <Building className="w-4 h-4" />
@@ -266,70 +350,90 @@ export default function Admin() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Users Tab */}
-          <TabsContent value="users">
+          {/* Department Admins Tab */}
+          <TabsContent value="admins">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="w-5 h-5" />
-                  User Roles
+                  Department Admins
                 </CardTitle>
                 <CardDescription>
-                  Manage who can respond to questions. Admins and Responders can post official answers.
+                  Assign admins to manage and answer questions for specific departments
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Roles</TableHead>
-                      <TableHead>Joined</TableHead>
-                      <TableHead className="w-[200px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((u) => (
-                      <TableRow key={u.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{u.full_name || "No name"}</p>
-                            <p className="text-sm text-muted-foreground">{u.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {u.roles.map((role) => (
-                              <Badge
-                                key={role}
-                                variant={role === 'admin' ? 'default' : role === 'responder' ? 'secondary' : 'outline'}
-                                className="cursor-pointer"
-                                onClick={() => handleRemoveRole(u.user_id, role)}
+              <CardContent className="space-y-6">
+                {/* Add New Admin Form */}
+                <div className="flex flex-col sm:flex-row gap-3 p-4 bg-secondary/30 rounded-lg">
+                  <div className="flex-1">
+                    <Label htmlFor="admin-email" className="sr-only">Email</Label>
+                    <Input
+                      id="admin-email"
+                      type="email"
+                      placeholder="admin@getblock.io"
+                      value={newAdminEmail}
+                      onChange={(e) => setNewAdminEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="admin-dept" className="sr-only">Department</Label>
+                    <Select value={newAdminDepartment} onValueChange={setNewAdminDepartment}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map(d => (
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={handleAddDepartmentAdmin} disabled={!newAdminEmail.trim() || !newAdminDepartment}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Admin
+                  </Button>
+                </div>
+
+                {/* Admins List by Department */}
+                {Object.keys(adminsByDepartment).length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">
+                    No department admins assigned yet
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(adminsByDepartment).map(([deptName, admins]) => (
+                      <div key={deptName} className="border rounded-lg">
+                        <div className="px-4 py-3 bg-muted/50 border-b">
+                          <h3 className="font-semibold flex items-center gap-2">
+                            <Building className="w-4 h-4" />
+                            {deptName}
+                            <Badge variant="secondary" className="ml-auto">
+                              {admins.length} admin{admins.length !== 1 ? 's' : ''}
+                            </Badge>
+                          </h3>
+                        </div>
+                        <div className="divide-y">
+                          {admins.map(admin => (
+                            <div key={admin.id} className="px-4 py-3 flex items-center justify-between">
+                              <div>
+                                <p className="font-medium">{admin.full_name || 'No name'}</p>
+                                <p className="text-sm text-muted-foreground">{admin.email}</p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveDepartmentAdmin(admin.id)}
+                                className="text-destructive hover:text-destructive"
                               >
-                                {role}
-                                {role !== 'employee' && <span className="ml-1">×</span>}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDistanceToNow(new Date(u.created_at), { addSuffix: true })}
-                        </TableCell>
-                        <TableCell>
-                          <Select onValueChange={(role) => handleAddRole(u.user_id, role)}>
-                            <SelectTrigger className="w-[150px]">
-                              <SelectValue placeholder="Add role..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="responder">Responder</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                      </TableRow>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -343,7 +447,7 @@ export default function Admin() {
                   Departments
                 </CardTitle>
                 <CardDescription>
-                  Manage departments that questions can be addressed to.
+                  Manage department categories for questions
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -414,10 +518,67 @@ export default function Admin() {
                   Questions
                 </CardTitle>
                 <CardDescription>
-                  Manage and moderate questions from the team.
+                  View and manage all questions from the team
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* Filters */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search questions..."
+                      value={questionSearch}
+                      onChange={(e) => setQuestionSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  
+                  <Select value={questionDeptFilter} onValueChange={setQuestionDeptFilter}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <Filter className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {departments.map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="flex gap-1 bg-secondary rounded-lg p-1">
+                    <Button
+                      variant={questionSort === 'newest' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setQuestionSort('newest')}
+                      className="gap-1.5"
+                    >
+                      <Clock className="w-4 h-4" />
+                      Newest
+                    </Button>
+                    <Button
+                      variant={questionSort === 'trending' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setQuestionSort('trending')}
+                      className="gap-1.5"
+                    >
+                      <TrendingUp className="w-4 h-4" />
+                      Trending
+                    </Button>
+                    <Button
+                      variant={questionSort === 'answered' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setQuestionSort('answered')}
+                      className="gap-1.5"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Answered
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Questions Table */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -430,52 +591,60 @@ export default function Admin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {questions.map((q) => (
-                      <TableRow key={q.id}>
-                        <TableCell>
-                          <button
-                            onClick={() => navigate(`/question/${q.id}`)}
-                            className="text-left font-medium hover:text-accent transition-colors line-clamp-1"
-                          >
-                            {q.title}
-                          </button>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {q.department?.name || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={q.status}
-                            onValueChange={(status) => handleUpdateQuestionStatus(q.id, status)}
-                          >
-                            <SelectTrigger className="w-[110px] h-8">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="open">Open</SelectItem>
-                              <SelectItem value="answered">Answered</SelectItem>
-                              <SelectItem value="closed">Closed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {q.answers_count}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDistanceToNow(new Date(q.created_at), { addSuffix: true })}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteQuestion(q.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                    {filteredQuestions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No questions found
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      filteredQuestions.map((q) => (
+                        <TableRow key={q.id}>
+                          <TableCell>
+                            <button
+                              onClick={() => navigate(`/question/${q.id}`)}
+                              className="text-left font-medium hover:text-accent transition-colors line-clamp-1"
+                            >
+                              {q.title}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {q.department?.name || "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={q.status}
+                              onValueChange={(status) => handleUpdateQuestionStatus(q.id, status)}
+                            >
+                              <SelectTrigger className="w-[110px] h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="open">Open</SelectItem>
+                                <SelectItem value="answered">Answered</SelectItem>
+                                <SelectItem value="closed">Closed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {q.answers_count}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDistanceToNow(new Date(q.created_at), { addSuffix: true })}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteQuestion(q.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
