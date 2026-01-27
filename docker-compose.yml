@@ -5,8 +5,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
     ports:
       - "80:80"
+      - "443:443"
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro  # Optional: for HTTPS
