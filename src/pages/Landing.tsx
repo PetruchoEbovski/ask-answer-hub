@@ -6,15 +6,7 @@ import {
   Send, 
   Building, 
   EyeOff, 
-  Check,
-  LayoutDashboard,
-  FileText,
-  Settings,
-  HelpCircle,
-  Users,
-  BarChart3,
-  Shield,
-  Bell
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,49 +126,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
-      <aside className="hidden lg:flex w-20 gradient-primary flex-col items-center py-6">
-        {/* Logo */}
-        <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center mb-8">
-          <MessageSquare className="w-6 h-6 text-primary-foreground" />
-        </div>
-        
-        {/* Navigation Icons */}
-        <nav className="flex flex-col items-center gap-2 flex-1">
-          <button className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center transition-colors hover:bg-white/30" title="Dashboard">
-            <LayoutDashboard className="w-5 h-5 text-primary-foreground" />
-          </button>
-          <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10" title="Questions">
-            <MessageSquare className="w-5 h-5 text-primary-foreground/70" />
-          </button>
-          <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10" title="Reports">
-            <FileText className="w-5 h-5 text-primary-foreground/70" />
-          </button>
-          <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10" title="Analytics">
-            <BarChart3 className="w-5 h-5 text-primary-foreground/70" />
-          </button>
-          <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10" title="Team">
-            <Users className="w-5 h-5 text-primary-foreground/70" />
-          </button>
-        </nav>
-        
-        {/* Bottom Icons */}
-        <div className="flex flex-col items-center gap-2 mt-auto">
-          <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10" title="Notifications">
-            <Bell className="w-5 h-5 text-primary-foreground/70" />
-          </button>
-          <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10" title="Security">
-            <Shield className="w-5 h-5 text-primary-foreground/70" />
-          </button>
-          <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10" title="Help">
-            <HelpCircle className="w-5 h-5 text-primary-foreground/70" />
-          </button>
-          <button className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10" title="Settings">
-            <Settings className="w-5 h-5 text-primary-foreground/70" />
-          </button>
-        </div>
-      </aside>
+    <div className="min-h-screen bg-background">
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col">
