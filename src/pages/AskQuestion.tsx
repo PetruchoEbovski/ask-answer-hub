@@ -65,6 +65,14 @@ export default function AskQuestion() {
       toast({ title: "Failed to submit question", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Question submitted successfully!" });
+      
+      // Send notification to department admins (fire and forget)
+      if (data.department_id) {
+        supabase.functions.invoke('notify-department-admins', {
+          body: { question: data }
+        }).catch(err => console.error('Failed to send notifications:', err));
+      }
+      
       navigate(`/question/${data.id}`);
     }
 

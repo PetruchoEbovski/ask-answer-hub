@@ -1,1 +1,4 @@
 project_id = "lrjkfijbztsjldsdpsbl"
+
+[functions.notify-department-admins]
+verify_jwt = false
