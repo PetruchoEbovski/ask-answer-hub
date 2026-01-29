@@ -336,20 +336,32 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
-            <TabsTrigger value="users" className="gap-2">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl h-12 bg-muted/50 p-1 rounded-lg">
+            <TabsTrigger 
+              value="users" 
+              className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all"
+            >
               <UserCog className="w-4 h-4" />
               Users
             </TabsTrigger>
-            <TabsTrigger value="admins" className="gap-2">
+            <TabsTrigger 
+              value="admins" 
+              className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all"
+            >
               <Users className="w-4 h-4" />
               Dept Admins
             </TabsTrigger>
-            <TabsTrigger value="departments" className="gap-2">
+            <TabsTrigger 
+              value="departments" 
+              className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all"
+            >
               <Building className="w-4 h-4" />
               Departments
             </TabsTrigger>
-            <TabsTrigger value="questions" className="gap-2">
+            <TabsTrigger 
+              value="questions" 
+              className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all"
+            >
               <MessageSquare className="w-4 h-4" />
               Questions
             </TabsTrigger>
