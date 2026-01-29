@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Building, MessageSquare, Shield, Plus, Trash2, Search, Filter, Clock, TrendingUp, CheckCircle } from "lucide-react";
+import { ArrowLeft, Users, Building, MessageSquare, Shield, Plus, Trash2, Search, Filter, Clock, TrendingUp, CheckCircle, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { UserManagement } from "@/components/admin/UserManagement";
 
 interface DepartmentAdmin {
   id: string;
@@ -334,11 +335,15 @@ export default function Admin() {
           </p>
         </div>
 
-        <Tabs defaultValue="admins" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+            <TabsTrigger value="users" className="gap-2">
+              <UserCog className="w-4 h-4" />
+              Users
+            </TabsTrigger>
             <TabsTrigger value="admins" className="gap-2">
               <Users className="w-4 h-4" />
-              Admins
+              Dept Admins
             </TabsTrigger>
             <TabsTrigger value="departments" className="gap-2">
               <Building className="w-4 h-4" />
@@ -349,6 +354,11 @@ export default function Admin() {
               Questions
             </TabsTrigger>
           </TabsList>
+
+          {/* Users Tab */}
+          <TabsContent value="users">
+            <UserManagement />
+          </TabsContent>
 
           {/* Department Admins Tab */}
           <TabsContent value="admins">
