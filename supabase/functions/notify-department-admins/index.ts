@@ -28,15 +28,87 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     
+    // Get authorization header for user verification
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      console.log("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Authorization required" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Create client with user's token to verify authentication
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    // Verify the user is authenticated
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    if (authError || !user) {
+      console.log("Authentication failed:", authError?.message);
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    console.log("Authenticated user:", user.id);
+
+    // Create service role client for admin operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { question } = await req.json() as { question: QuestionPayload };
     
-    console.log("Received question notification request:", question);
+    // Input validation
+    if (!question || !question.id) {
+      console.log("Invalid request payload - missing question or id");
+      return new Response(
+        JSON.stringify({ error: "Invalid request payload" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    console.log("Received question notification request for question:", question.id);
+
+    // SECURITY: Verify the question exists in the database and belongs to the caller
+    const { data: questionData, error: questionError } = await supabase
+      .from("questions")
+      .select("id, author_id, department_id, title, content, is_anonymous")
+      .eq("id", question.id)
+      .single();
+
+    if (questionError || !questionData) {
+      console.log("Question not found:", question.id);
+      return new Response(
+        JSON.stringify({ error: "Question not found" }),
+        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Verify the authenticated user is the author of the question
+    if (questionData.author_id !== user.id) {
+      console.log("User is not the author of this question");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - not the question author" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Use validated data from database, not from client payload
+    const validatedQuestion = {
+      id: questionData.id,
+      title: questionData.title,
+      content: questionData.content,
+      department_id: questionData.department_id,
+      is_anonymous: questionData.is_anonymous,
+      author_id: questionData.author_id,
+    };
 
     // If no department assigned, skip notification
-    if (!question.department_id) {
+    if (!validatedQuestion.department_id) {
       console.log("No department assigned to question, skipping notification");
       return new Response(
         JSON.stringify({ message: "No department assigned, skipping" }),
@@ -48,7 +120,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: department, error: deptError } = await supabase
       .from("departments")
       .select("name")
-      .eq("id", question.department_id)
+      .eq("id", validatedQuestion.department_id)
       .single();
 
     if (deptError) {
@@ -62,7 +134,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: departmentAdmins, error: adminsError } = await supabase
       .from("department_admins")
       .select("user_id")
-      .eq("department_id", question.department_id);
+      .eq("department_id", validatedQuestion.department_id);
 
     if (adminsError) {
       console.error("Error fetching department admins:", adminsError);
@@ -101,11 +173,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Get author info if not anonymous
     let authorName = "Anonymous";
-    if (!question.is_anonymous && question.author_id) {
+    if (!validatedQuestion.is_anonymous && validatedQuestion.author_id) {
       const { data: authorProfile } = await supabase
         .from("profiles")
         .select("full_name, email")
-        .eq("user_id", question.author_id)
+        .eq("user_id", validatedQuestion.author_id)
         .single();
       
       if (authorProfile) {
@@ -118,7 +190,7 @@ const handler = async (req: Request): Promise<Response> => {
       const adminEmail = admin.email;
       const adminName = admin.full_name || "Admin";
 
-      console.log(`Sending notification to ${adminEmail}`);
+      console.log(`Sending notification to admin (user_id: ${admin.user_id})`);
 
       try {
         const result = await resend.emails.send({
@@ -132,8 +204,8 @@ const handler = async (req: Request): Promise<Response> => {
               <p>A new question has been submitted to the <strong>${department.name}</strong> department that requires your attention.</p>
               
               <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="color: #333; margin-top: 0;">${question.title}</h3>
-                <p style="color: #666;">${question.content.substring(0, 300)}${question.content.length > 300 ? '...' : ''}</p>
+                <h3 style="color: #333; margin-top: 0;">${validatedQuestion.title}</h3>
+                <p style="color: #666;">${validatedQuestion.content.substring(0, 300)}${validatedQuestion.content.length > 300 ? '...' : ''}</p>
                 <p style="color: #888; font-size: 14px;">Asked by: ${authorName}</p>
               </div>
               
@@ -146,31 +218,30 @@ const handler = async (req: Request): Promise<Response> => {
           `,
         });
         
-        console.log(`Email sent to ${adminEmail}:`, result);
-        return { email: adminEmail, success: true, result };
+        console.log(`Email sent successfully to admin (user_id: ${admin.user_id})`);
+        return { user_id: admin.user_id, success: true };
       } catch (emailError: any) {
-        console.error(`Failed to send email to ${adminEmail}:`, emailError);
-        return { email: adminEmail, success: false, error: emailError.message };
+        console.error(`Failed to send email to admin (user_id: ${admin.user_id}):`, emailError.message);
+        return { user_id: admin.user_id, success: false, error: emailError.message };
       }
     });
 
     const results = await Promise.all(emailPromises);
-    console.log("Email sending results:", results);
+    console.log("Email sending completed");
 
     const successCount = results.filter(r => r.success).length;
     
     return new Response(
       JSON.stringify({ 
-        message: `Notifications sent to ${successCount}/${results.length} admins`,
-        results 
+        message: `Notifications sent to ${successCount}/${results.length} admins`
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
 
   } catch (error: any) {
-    console.error("Error in notify-department-admins function:", error);
+    console.error("Error in notify-department-admins function:", error.message);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
