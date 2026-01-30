@@ -88,9 +88,10 @@ export default function QuestionDetail() {
 
     // Fetch author profile if exists
     let authorData = null;
+    // Use profiles_public view to avoid exposing email addresses
     if (questionData.author_id) {
       const { data } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('full_name, avatar_url')
         .eq('user_id', questionData.author_id)
         .single();
@@ -139,9 +140,10 @@ export default function QuestionDetail() {
       ...answersData.flatMap(a => a.comments.map(c => c.author_id))
     ].filter(Boolean);
 
+    // Use profiles_public view to avoid exposing email addresses
     const { data: profilesData } = await supabase
-      .from('profiles')
-      .select('user_id, full_name, avatar_url, email')
+      .from('profiles_public')
+      .select('user_id, full_name, avatar_url')
       .in('user_id', allAuthorIds);
 
     const profilesMap = new Map(profilesData?.map(p => [p.user_id, p]) || []);

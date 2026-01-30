@@ -99,8 +99,9 @@ export default function Questions() {
       .filter(q => !q.is_anonymous && q.author_id)
       .map(q => q.author_id);
     
+    // Use profiles_public view to avoid exposing email addresses
     const { data: profilesData } = authorIds.length > 0 
-      ? await supabase.from('profiles').select('user_id, full_name').in('user_id', authorIds)
+      ? await supabase.from('profiles_public').select('user_id, full_name').in('user_id', authorIds)
       : { data: [] };
     
     const profilesMap = new Map<string, QuestionAuthor>();
