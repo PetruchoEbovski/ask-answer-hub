@@ -3,18 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { 
   MessageSquare, 
   LogIn, 
-  Send, 
-  Building, 
   EyeOff, 
   Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,12 +16,6 @@ type Mode = 'ask' | 'signin';
 
 export default function Landing() {
   const [mode, setMode] = useState<Mode>('ask');
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [departmentId, setDepartmentId] = useState<string>("");
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   
   const { toast } = useToast();
@@ -41,44 +28,13 @@ export default function Landing() {
     }
   }, [user, navigate]);
 
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      const { data } = await supabase.from('departments').select('id, name').order('name');
-      if (data) setDepartments(data);
-    };
-    fetchDepartments();
-  }, []);
-
-  const handleSubmitQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !content.trim()) {
-      toast({ title: "Please fill in all required fields", variant: "destructive" });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const { error } = await supabase
-      .from('questions')
-      .insert({
-        title: title.trim(),
-        content: content.trim(),
-        department_id: departmentId || null,
-        is_anonymous: true,
-        author_id: null,
-      });
-
-    if (error) {
-      console.error('Error submitting question:', error);
-      toast({ title: "Failed to submit question", description: error.message, variant: "destructive" });
-    } else {
-      setSubmitted(true);
-      setTitle("");
-      setContent("");
-      setDepartmentId("");
-    }
-
-    setIsSubmitting(false);
+  const handleAskQuestion = () => {
+    // Redirect to sign in - anonymous question submission is no longer allowed for security
+    setMode('signin');
+    toast({ 
+      title: "Sign in required", 
+      description: "Please sign in to ask a question. Your identity can remain anonymous.",
+    });
   };
 
   const handleGoogleSignIn = async () => {
@@ -147,91 +103,42 @@ export default function Landing() {
         {/* Content */}
         <div className="flex-1 p-6 md:p-8 max-w-2xl mx-auto w-full">
           {mode === 'ask' ? (
-            submitted ? (
-              <Card className="shadow-lg border-border/50 animate-slide-up">
-                <CardContent className="py-12 text-center">
-                  <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
-                    <Check className="w-8 h-8 text-success" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Question Submitted!</h2>
-                  <p className="text-muted-foreground mb-6">
-                    Your anonymous question has been sent. A team member will respond soon.
-                  </p>
-                  <Button onClick={() => setSubmitted(false)}>
-                    Ask Another Question
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
               <Card className="shadow-lg border-border/50 animate-slide-up">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <EyeOff className="w-5 h-5 text-primary" />
-                    Submit Anonymous Question
+                    Ask a Question
                   </CardTitle>
                   <CardDescription>
-                    Your identity will remain completely anonymous. Only your question will be visible.
+                    Sign in to ask questions. You can choose to remain anonymous - your identity will be hidden from others.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmitQuestion} className="space-y-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="title">Question Title *</Label>
-                      <Input
-                        id="title"
-                        placeholder="What would you like to ask?"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        maxLength={200}
-                        required
-                      />
-                      <p className="text-xs text-muted-foreground text-right">
-                        {title.length}/200
-                      </p>
+                <CardContent className="space-y-6">
+                  <div className="bg-secondary/50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary" />
+                      <span>Choose to post anonymously or with your name</span>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="content">Details *</Label>
-                      <Textarea
-                        id="content"
-                        placeholder="Provide more context about your question..."
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        className="min-h-[120px]"
-                        required
-                      />
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary" />
+                      <span>Direct questions to specific departments</span>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="department">
-                        <Building className="w-4 h-4 inline mr-1.5" />
-                        Department (optional)
-                      </Label>
-                      <Select value={departmentId} onValueChange={setDepartmentId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a department..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departments.map(d => (
-                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary" />
+                      <span>Get responses from team leaders</span>
                     </div>
+                  </div>
 
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting || !title.trim() || !content.trim()}
-                      className="w-full gap-2"
-                      size="lg"
-                    >
-                      <Send className="w-4 h-4" />
-                      {isSubmitting ? "Submitting..." : "Submit Question Anonymously"}
-                    </Button>
-                  </form>
+                  <Button
+                    onClick={handleAskQuestion}
+                    className="w-full gap-2"
+                    size="lg"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Sign In to Ask a Question
+                  </Button>
                 </CardContent>
               </Card>
-            )
           ) : (
             <Card className="shadow-lg border-border/50 animate-slide-up">
               <CardHeader className="text-center">
