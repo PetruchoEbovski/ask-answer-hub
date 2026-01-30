@@ -56,7 +56,7 @@ export default function AskQuestion() {
         content: content.trim(),
         department_id: departmentId || null,
         is_anonymous: isAnonymous,
-        author_id: user.id,
+        author_id: isAnonymous ? null : user.id,
       })
       .select()
       .single();
